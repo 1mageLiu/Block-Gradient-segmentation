@@ -1,0 +1,114 @@
+clear all;
+close all;
+im1=imread('拉伸3%.jpg');
+im=rgb2gray(im1)
+
+im=imadjust (im);
+figure
+imshow(im)
+ 
+ 
+ 
+ff = im; 
+size1 = size(ff);  
+ 
+% block processing
+blocknum =16;    % number of blocks
+length = size1(1);  
+height = size1(2);  
+lengthSide = floor(length/blocknum);  % length of each block
+heightSide = floor(height/blocknum);  % length of each block
+ 
+%开始分块处理
+for k = 1:blocknum
+    for n = 1:blocknum
+    
+        %生成模板
+        block = zeros(size(ff));    %将模板初始化为0
+        lini = 1 + lengthSide * (n - 1);
+        hini = 1 + heightSide * (k - 1);     %分块的第一个像素在原图中的坐标
+        x = lini:(lini + lengthSide - 1);
+        y = hini:(hini + heightSide - 1);    %生成分块长、宽坐标序列
+        block(x, y) = 1;                     %将模板上需要进行分块的部分转换成1，用来提取该分块
+        
+        %提取分块
+        ff = double(ff);     %原图转换为double类型，保证和模板black同类型以做点乘
+        block = block .* ff;    %将原图投影在模板上
+        block = block(x, y);    %提取分块
+        
+        %%%%%%%%%%%%%%%%%%分割处理%%%%%%%%%%%%%%%%%%%%%
+        
+        block=double(block)/255;  
+        w = 2;       % bilateral filter half-width  
+        sigma = [3 0.1]; % bilateral filter standard deviations  
+        block=bfilter2(block,w,sigma);  
+        block=im2uint8(block);
+        block=double(block);
+ 
+        
+        
+        
+        z=3; % 梯度阈值
+        [mdex ] = MainDirec(block);
+        [a,b]=gradient(block);  %获取梯度 
+        G=block;
+        if 9<=mdex&&mdex<=27
+            G(a>=z)=255;  %y方向梯度提取边缘
+            G(a<z)=0;
+        else
+            G(b>=z)=255;  %y方向梯度提取边缘
+            G(b<z)=0;
+        end
+        bw=G;
+        [m,n] = size(bw);
+        for i = 2:m-1
+        for j = 2:n-1
+       %同上下元素判断       
+            if(bw(i,j)~=bw(i+1,j) && bw(i,j)~=bw(i-1,j))
+                bw(i,j) = 1;
+       %同左右元素判断
+            elseif(bw(i,j)~=bw(i,j+1) && bw(i,j)~=bw(i,j-1))
+                bw(i,j) = 1;
+       %同斜边元素判断
+            elseif(bw(i,j)~=bw(i+1,j+1) && bw(i,j)~=bw(i-1,j-1))
+                bw(i,j) = 1;
+       %同斜边元素判断
+            elseif(bw(i,j)~=bw(i-1,j+1) && bw(i,j)~=bw(i+1,j-1))
+                bw(i,j) = 1;
+            end
+        end
+        end
+        bw=bwareaopen(bw,200)
+ 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+       
+        %拼接
+        ff(x,y) =bw;     %将阈值分割处理过的分块放回原图
+    end
+end
+ff=bwareaopen(ff,200)
+figure
+ imshow(ff)
+ 
+ S=numel(ff);%像素点总数
+s=sum(sum(ff));%白色点总数
+ratio=s/S;%白色面积比
+ 
+ 
+ 
+ 
+ 
+ [m,n]=size(ff);
+image(:,:,3)=zeros(m,n);
+image(:,:,2)=zeros(m,n);
+image(:,:,1)=ff.*255;
+figure
+imshow(image)
+ 
+im1=double(im1);
+image=double(image);
+c=imadd(im1,image);
+c=uint8(c)
+figure
+imshow(c)
+imwrite(c,'55.jpg')
